@@ -1,84 +1,39 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-ESP32-based escape room prop controller using PlatformIO with Arduino framework. Target board: `esp32dev`. This is a modular template where features are enabled/disabled via configuration flags.
+ESP32-S3 ESP-NOW receiver for the Christmas Red Rider room. Receives commands from the room hub and monitors a button input.
+
+**Target Board:** ESP32-S3-DevKitC-1 (N8R2: 8MB Flash, 2MB PSRAM)
 
 ## Build Commands
 
 ```bash
 pio run                    # Build
-pio run --target upload    # Upload to ESP32
+pio run --target upload    # Upload to ESP32-S3
 pio run --target clean     # Clean build
 pio device monitor         # Serial monitor (115200 baud)
 ```
 
 ## Architecture
 
-### Configuration-Driven Design
-
-All configuration lives in `src/config.h`. This is the primary entry point for customization:
-- `DEVICE_IDENTIFIER` - Used for MQTT topics, mDNS hostname, OTA name
-- Module enable flags: `USE_WIFI`, `USE_MQTT`, `USE_MDNS`, `USE_OTA`, `USE_ESPNOW`
-- Network credentials, broker settings, pin definitions
-
-### Module System
-
-Five conditionally-compiled modules in `src/modules/`:
-
-| Module | Flag | Requires | Purpose |
-|--------|------|----------|---------|
-| WiFi | `USE_WIFI` | - | Network connectivity with auto-reconnect |
-| MQTT | `USE_MQTT` | WiFi | Pub/sub messaging, auto-status publishing |
-| mDNS | `USE_MDNS` | WiFi | Local discovery (`hostname.local`) |
-| OTA | `USE_OTA` | WiFi | Over-the-air firmware updates |
-| ESP-NOW | `USE_ESPNOW` | - | Low-latency peer-to-peer (host/client modes) |
-
-Dependency violations produce compile-time errors.
-
-### Dual-Core Task Distribution
-
-- **Core 0**: WiFi reconnection task (5s interval), OTA update handling
-- **Core 1**: MQTT client loop, game logic, callbacks
-
 ### Code Flow
-
 ```
-main.cpp          → setup() and loop() entry points, callback handlers
-  ├── setup.cpp   → Module initialization, startup diagnostics
-  ├── loop.cpp    → Main loop: MQTT updates, OTA checks, game logic
-  └── SampleFunction.cpp → Placeholder for puzzle logic
+main.cpp          → Entry points, ESP-NOW callbacks
+├── setup.cpp     → Module initialization
+├── loop.cpp      → Main loop dispatcher
+└── SampleFunction.cpp → Game logic placeholder
 ```
 
-### MQTT Topic Convention
+### Configuration
+All settings in `src/config.h`:
+- `DEVICE_IDENTIFIER` - Device name for logging
+- `ESPNOW_HOST` - Set to 0 (client mode)
+- `ESPNOW_HOST_MAC` - MAC of the room hub
+- `BUTTON_PIN` - GPIO for button input
 
-Topics auto-constructed from device identifier:
-- Base: `{MQTT_TOPIC_PREFIX}{DEVICE_IDENTIFIER}` (e.g., `SP/EngineStatus`)
-- Status: `{base}/status` (publishes "Online" on connect)
-- Command: `{base}/cmd` (auto-subscribed)
-- Absolute topics start with `/` to bypass prefix
+## ESP32-S3 Notes
 
-### ESP-NOW Modes
-
-- **Host** (`ESPNOW_HOST 1`): Broadcasts to all registered clients
-- **Client** (`ESPNOW_HOST 0`): Listens via receive callbacks, sends to host MAC only
-
-## Key Patterns
-
-**MQTT Publish**: `mqttPublish("state", "SOLVED", true)` (topic suffix, message, retained)
-
-**Callbacks**: Registered in `setup.cpp` via function pointers (`onMqttMessage`, `onEspNowReceive`)
-
-**OTA Blocking**: Main loop checks `otaIsUpdating()` and returns early during updates
-
-## Development Workflow
-
-1. Edit `config.h` to set device name and enable required modules
-2. Implement puzzle logic in `SampleFunction.cpp`
-3. Build and upload with `pio run --target upload`
-
-## Reference
-
-See `template_use.md` for comprehensive module documentation with code examples.
+- Different GPIO numbering than original ESP32
+- PSRAM enabled via build flags
+- Verify button pin supports input mode
